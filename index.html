@@ -415,22 +415,24 @@
       <textarea id="user-input" placeholder="Digite sua mensagem..."></textarea>
       <button id="send-btn">Enviar</button>
     </div>
-  </div>
 
-  <button id="open-terminal">Terminal PowerShell</button>
-  <button id="start-server-btn" style="position:fixed; right:180px; bottom:20px; z-index:9999; padding:10px 14px; border-radius:10px; background:#10b981; color:#fff; border:none; cursor:pointer;">Iniciar Servidor</button>
-
-  <div id="terminal-panel">
-    <div class="terminal-header-bar">
-      <span>Windows PowerShell — Conexão Local</span>
-      <button id="close-terminal" class="close-terminal-btn">✕</button>
+    <div id="terminal-buttons-container">
+      <button id="open-terminal">Terminal PowerShell</button>
+      <button id="start-server-btn">Iniciar Servidor</button>
     </div>
 
-    <div id="terminal-output"></div>
+    <div id="terminal-panel">
+      <div class="terminal-header-bar">
+        <span>Windows PowerShell — Conexão Local</span>
+        <button id="close-terminal" class="close-terminal-btn">✕</button>
+      </div>
 
-    <div class="terminal-input-area">
-      <input id="terminal-input" placeholder='ex: whoami / date / dir' />
-      <button id="terminal-send">Executar</button>
+      <div id="terminal-output"></div>
+
+      <div class="terminal-input-area">
+        <input id="terminal-input" placeholder='ex: whoami / date / dir' />
+        <button id="terminal-send">Executar</button>
+      </div>
     </div>
   </div>
 
