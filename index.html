@@ -689,6 +689,14 @@
       }
     }
 
+    function toggleTerminal() {
+      const isOpen = terminalPanel.style.display === "flex";
+      terminalPanel.style.display = isOpen ? "none" : "flex";
+      if (!isOpen) {
+        terminalInput.focus();
+      }
+    }
+
     chatSendBtn.addEventListener("click", sendMessage);
     chatInput.addEventListener("keypress", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -726,19 +734,36 @@
       terminalPanel.style.display = 'none';
     });
 
+    // CONFIGURE AQUI (apenas localhost recomendado)
+    const SERVER_URL = 'http://127.0.0.1:3001/exec';
+    const TOKEN = 'um-token-muito-forte-que-so-eu-conheco'; // coloque mesmo token do servidor (ou obtenha dinamicamente)
+
     async function executeTerminalCommand() {
       const command = terminalInput.value.trim();
       if (!command) return;
 
-      terminalOutput.innerHTML += `<span style="color:#88b0ff;">PS C:\\Gemini chat></span> ${escapeHtml(command)}\n`;
+      terminalOutput.innerHTML += `<span style="color:#88b0ff;">PS C:\Gemini chat></span> ${escapeHtml(command)}\n`;
       terminalInput.value = '';
       terminalOutput.scrollTop = terminalOutput.scrollHeight;
 
-      // Placeholder for actual command execution
-      // In a real application, this would send the command to a backend
-      // and display the response.
-      terminalOutput.innerHTML += `<span style="color:#ffcc00;">Executando comando:</span> ${escapeHtml(command)}\n`;
-      terminalOutput.innerHTML += `<span style="color:#d1ffd6;">(Simulação) Comando '${escapeHtml(command)}' executado com sucesso.</span>\n`;
+      try {
+        const res = await fetch(SERVER_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + TOKEN
+          },
+          body: JSON.stringify({ command: command })
+        });
+        const data = await res.json();
+        if (data.error) {
+          terminalOutput.innerHTML += `<span style="color:#ff6666;">[ERRO] ${escapeHtml(data.error)}</span>\n`;
+        }
+        if (data.stdout) terminalOutput.innerHTML += `<span style="color:#d1ffd6;">${escapeHtml(data.stdout)}</span>\n`;
+        if (data.stderr) terminalOutput.innerHTML += `<span style="color:#ff6666;">${escapeHtml(data.stderr)}</span>\n`;
+      } catch (err) {
+        terminalOutput.innerHTML += `<span style="color:#ff6666;">[FALHA] não foi possível conectar ao servidor local. Verifique se o servidor Node está rodando em ${SERVER_URL} e o token está correto.</span>\n`;
+      }
       terminalOutput.scrollTop = terminalOutput.scrollHeight;
     }
 
@@ -749,6 +774,9 @@
         executeTerminalCommand();
       }
     });
+
+    terminalOutput.innerHTML += '<span style="color:#ffcc00;">Terminal local pronto. Use apenas se o servidor local estiver rodando e protegido.</span>\n';
+    terminalOutput.scrollTop = terminalOutput.scrollHeight;
 
     renderConversationList();
     loadConversation(currentConvId);
