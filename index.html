@@ -352,6 +352,18 @@
       border: none;
       cursor: pointer;
     }
+    #start-server-btn {
+      position: fixed;
+      right: 180px;
+      bottom: 20px;
+      z-index: 9999;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: #10b981;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
 
     #terminal-panel {
       position: fixed;
@@ -460,6 +472,7 @@
   </div>
 
   <button id="open-terminal">Terminal PowerShell</button>
+  <button id="start-server-btn" style="position:fixed; right:180px; bottom:20px; z-index:9999; padding:10px 14px; border-radius:10px; background:#10b981; color:#fff; border:none; cursor:pointer;">Iniciar Servidor</button>
 
   <div id="terminal-panel">
     <div class="terminal-header-bar">
@@ -723,16 +736,23 @@
     const terminalOutput = document.getElementById('terminal-output');
     const terminalInput = document.getElementById('terminal-input');
     const terminalSendBtn = document.getElementById('terminal-send');
+    const startServerBtn = document.getElementById('start-server-btn');
 
-    openTerminalBtn.addEventListener('click', () => {
-      terminalPanel.style.display = 'block';
-      terminalOutput.scrollTop = terminalOutput.scrollHeight;
-      terminalInput.focus();
-    });
+    openTerminalBtn.addEventListener('click', toggleTerminal);
 
     closeTerminalBtn.addEventListener('click', () => {
       terminalPanel.style.display = 'none';
     });
+
+    function displayServerStartInstructions() {
+      terminalOutput.innerHTML += '<span style="color:#ffcc00;">Para iniciar o servidor, abra um terminal separado e execute:</span>\n';
+      terminalOutput.innerHTML += '<span style="color:#d1ffd6;">cd "c:\\Gemini chat"</span>\n';
+      terminalOutput.innerHTML += '<span style="color:#d1ffd6;">node server.js</span>\n';
+      terminalOutput.innerHTML += '<span style="color:#ffcc00;">Certifique-se de ter Node.js instalado.</span>\n';
+      terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+    startServerBtn.addEventListener('click', displayServerStartInstructions);
 
     // CONFIGURE AQUI (apenas localhost recomendado)
     const SERVER_URL = 'http://127.0.0.1:3001/exec';
