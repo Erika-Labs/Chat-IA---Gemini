@@ -1,0 +1,19 @@
+{
+  "name": "gemini-chat-terminal",
+  "version": "1.0.0",
+  "description": "Servidor para terminal integrado do Chat IA Gemini",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "body-parser": "^1.20.2",
+    "node-fetch": "^2.7.0"
+  },
+  "keywords": ["gemini", "chat", "terminal", "api"],
+  "author": "Julio Campos",
+  "license": "MIT"
+}

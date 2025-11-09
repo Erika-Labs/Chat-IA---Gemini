@@ -13,6 +13,16 @@ echo   Instalador Chat IA Gemini - Julio Campos
 echo ============================================
 echo.
 
+echo [Extra] Verificando container PowerShell...
+docker ps -q -f name=powershell-container >nul 2>&1
+IF ERRORLEVEL 1 (
+    echo Criando container PowerShell...
+    docker run -itd --name powershell-container mcr.microsoft.com/powershell:latest
+) ELSE (
+    echo ✅ Container PowerShell já em execução.
+)
+
+
 :: Verifica se o Node.js está instalado
 echo [1/6] Verificando Node.js...
 node -v >nul 2>&1
