@@ -263,7 +263,7 @@
       border-top: 1px solid rgba(51, 65, 85, 0.5);
     }
 
-    #open-terminal, #start-server-btn, #download-server-btn, #download-installer-btn {
+    #open-terminal, #start-server-btn, #download-server-btn, #download-installer-btn, #ai-assistant-btn {
       padding: 12px 20px;
       border-radius: 10px;
       border: none;
@@ -272,6 +272,16 @@
       font-size: 14px;
       transition: all 0.2s ease;
       box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    #ai-assistant-btn {
+      background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+      color: white;
+    }
+
+    #ai-assistant-btn:hover {
+      background: linear-gradient(135deg, #db2777 0%, #be185d 100%);
+      transform: translateY(-2px);
     }
 
     #open-terminal {
@@ -537,6 +547,7 @@
 
     <div id="terminal-buttons-container">
       <button id="open-terminal">Terminal PowerShell Real</button>
+      <button id="ai-assistant-btn">Assistente IA de Tarefas</button>
       <button id="start-server-btn">Iniciar Servidor</button>
       <button id="download-server-btn">Baixar Server.js</button>
       <button id="download-installer-btn">Baixar Instalador</button>
@@ -619,6 +630,7 @@
     const startServerBtn = document.getElementById('start-server-btn');
     const downloadServerBtn = document.getElementById('download-server-btn');
     const downloadInstallerBtn = document.getElementById('download-installer-btn');
+    const aiAssistantBtn = document.getElementById('ai-assistant-btn');
 
     // Server configuration
     const SERVER_URL = 'https://85cf818df1d7.ngrok-free.app -> http://localhost:3001';
@@ -935,6 +947,150 @@
       }
     }
 
+    async function aiAssistant() {
+      if (!config.apiKey) {
+        alert("Por favor, configure sua chave API do Gemini primeiro!");
+        openConfig();
+        return;
+      }
+
+      const userTask = prompt("Descreva o que você quer que o assistente faça (ex: 'instalar nginx e iniciar o serviço', 'criar estrutura de projeto Node.js'):");
+      if (!userTask || !userTask.trim()) return;
+
+      addTerminalMessage("=== ASSISTENTE IA ATIVADO ===", "warning");
+      addTerminalMessage(`Tarefa solicitada: ${userTask}`, "info");
+      addTerminalMessage("Gerando plano de execucao...", "info");
+
+      try {
+        const systemPrompt = `Você é um assistente de terminal Linux/PowerShell inteligente. Crie um plano de execução detalhado em formato JSON contendo uma lista de tarefas numeradas. Para cada tarefa, forneça:
+- "step": número da etapa
+- "description": descrição clara do que será feito
+- "command": comando exato a ser executado no terminal
+- "validation": como verificar se o comando funcionou
+
+Retorne APENAS o JSON válido, sem explicações adicionais. Exemplo de formato:
+{
+  "tasks": [
+    {
+      "step": 1,
+      "description": "Atualizar lista de pacotes",
+      "command": "apt-get update",
+      "validation": "echo 'Lista atualizada'"
+    }
+  ]
+}`;
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: systemPrompt }] },
+              contents: [{ parts: [{ text: `Crie um plano de execução para: ${userTask}` }] }],
+            }),
+          }
+        );
+
+        const data = await response.json();
+        let aiResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+        aiResponse = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+        addTerminalMessage("=== PLANO GERADO ===", "warning");
+        addTerminalMessage(aiResponse, "info");
+
+        let tasksPlan;
+        try {
+          tasksPlan = JSON.parse(aiResponse);
+        } catch (e) {
+          addTerminalMessage("Erro ao processar JSON. Tentando extrair comandos...", "error");
+          const commandMatches = aiResponse.match(/"command"\s*:\s*"([^"]+)"/g);
+          if (commandMatches) {
+            tasksPlan = {
+              tasks: commandMatches.map((match, index) => ({
+                step: index + 1,
+                description: `Tarefa ${index + 1}`,
+                command: match.match(/"command"\s*:\s*"([^"]+)"/)[1],
+                validation: "echo 'Concluído'"
+              }))
+            };
+          } else {
+            addTerminalMessage("Não foi possível extrair comandos do plano.", "error");
+            return;
+          }
+        }
+
+        if (!tasksPlan.tasks || tasksPlan.tasks.length === 0) {
+          addTerminalMessage("Nenhuma tarefa encontrada no plano.", "error");
+          return;
+        }
+
+        const confirmExecution = confirm(`Foram geradas ${tasksPlan.tasks.length} tarefas. Deseja executá-las sequencialmente?`);
+        if (!confirmExecution) {
+          addTerminalMessage("Execução cancelada pelo usuário.", "warning");
+          return;
+        }
+
+        addTerminalMessage("=== INICIANDO EXECUÇÃO ===", "warning");
+
+        for (const task of tasksPlan.tasks) {
+          addTerminalMessage(`\n[Etapa ${task.step}] ${task.description}`, "warning");
+          addTerminalMessage(`Comando: ${task.command}`, "command");
+
+          try {
+            const execResponse = await fetch(SERVER_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${TOKEN}`
+              },
+              body: JSON.stringify({ command: task.command })
+            });
+
+            if (!execResponse.ok) {
+              throw new Error(`Servidor respondeu com status: ${execResponse.status}`);
+            }
+
+            const execData = await execResponse.json();
+
+            if (execData.stdout) {
+              addTerminalMessage(execData.stdout);
+            }
+            if (execData.stderr) {
+              addTerminalMessage(execData.stderr, "error");
+            }
+            if (execData.error) {
+              addTerminalMessage(`Erro: ${execData.error}`, "error");
+              const continueOnError = confirm(`Erro na etapa ${task.step}. Deseja continuar com as próximas tarefas?`);
+              if (!continueOnError) {
+                addTerminalMessage("Execução interrompida pelo usuário.", "warning");
+                return;
+              }
+            } else {
+              addTerminalMessage(`Etapa ${task.step} concluída com sucesso!`, "info");
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+          } catch (error) {
+            addTerminalMessage(`Erro de conexão na etapa ${task.step}: ${error.message}`, "error");
+            const continueOnError = confirm(`Erro de conexão na etapa ${task.step}. Deseja continuar?`);
+            if (!continueOnError) {
+              addTerminalMessage("Execução interrompida pelo usuário.", "warning");
+              return;
+            }
+          }
+        }
+
+        addTerminalMessage("\n=== TODAS AS TAREFAS FORAM CONCLUÍDAS ===", "warning");
+        addTerminalMessage("O assistente IA finalizou a execução!", "info");
+
+      } catch (err) {
+        addTerminalMessage(`Erro ao consultar o Gemini: ${err.message}`, "error");
+      }
+    }
+
     // Event Listeners
     chatSendBtn.addEventListener("click", sendMessage);
     chatInput.addEventListener("keypress", (e) => {
@@ -1011,6 +1167,13 @@
       } catch (error) {
         addTerminalMessage(`Erro ao baixar o instalador do servidor: ${error.message}`, 'error');
       }
+    });
+
+    aiAssistantBtn.addEventListener('click', () => {
+      if (terminalPanel.style.display !== "flex") {
+        toggleTerminal();
+      }
+      aiAssistant();
     });
 
     // Initialize
