@@ -6,6 +6,49 @@ const bodyParser = require('body-parser');
 const fetch = require('node-fetch'); // npm i node-fetch
 const { exec } = require('child_process');
 
+// ==========================
+// AUTOSETUP DO CONTAINER
+// ==========================
+console.log('🔧 Verificando ambiente Docker...');
+
+function runCmd(cmd) {
+  return new Promise((resolve, reject) => {
+    exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) return reject(stderr || err.message);
+      resolve(stdout.trim());
+    });
+  });
+}
+
+async function setupContainer() {
+  try {
+    // Verifica se o Docker está disponível
+    await runCmd('docker info');
+    console.log('✅ Docker disponível');
+
+    // Verifica se o container já existe
+    const containers = await runCmd('docker ps -a --format "{{.Names}}"');
+    if (containers.includes('powershell-container')) {
+      console.log('🔁 Container existente detectado: powershell-container');
+      await runCmd('docker start powershell-container');
+      return;
+    }
+
+    // Se não existe, cria um container novo
+    console.log('🚀 Criando container PowerShell com Git...');
+    await runCmd('docker run -dit --name powershell-container mcr.microsoft.com/powershell pwsh');
+    console.log('✅ Container criado e em execução.');
+    console.log('💡 Dica: o container pode ser inspecionado via "docker exec -it powershell-container pwsh"');
+  } catch (err) {
+    console.error('❌ Erro ao inicializar o container:', err);
+    console.warn('⚠️  Certifique-se de ter o Docker instalado e em execução.');
+  }
+}
+
+// Executa imediatamente a criação do container
+setupContainer();
+
+
 const app = express();
 app.use(helmet());
 app.use(bodyParser.json({ limit: '200kb' }));
