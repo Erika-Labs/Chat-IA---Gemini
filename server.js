@@ -3,93 +3,36 @@
 const express = require('express');
 const helmet = require('helmet');
 const bodyParser = require('body-parser');
-const fetch = require('node-fetch'); // npm i node-fetch
-const { exec } = require('child_process');
-
-// ==========================
-// AUTOSETUP DO CONTAINER
-// ==========================
-console.log('🔧 Verificando ambiente Docker...');
-
-function runCmd(cmd) {
-  return new Promise((resolve, reject) => {
-    exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (err) return reject(stderr || err.message);
-      resolve(stdout.trim());
-    });
-  });
-}
-
-async function setupContainer() {
-  try {
-    // Verifica se o Docker está disponível
-    await runCmd('docker info');
-    console.log('✅ Docker disponível');
-
-    // Verifica se o container já existe
-    const containers = await runCmd('docker ps -a --format "{{.Names}}"');
-    if (containers.includes('powershell-container')) {
-      console.log('🔁 Container existente detectado: powershell-container');
-      await runCmd('docker start powershell-container');
-      return;
-    }
-
-    // Se não existe, cria um container novo
-    console.log('🚀 Criando container PowerShell com Git...');
-    await runCmd('docker run -dit --name powershell-container mcr.microsoft.com/powershell pwsh');
-    console.log('✅ Container criado e em execução.');
-    console.log('💡 Dica: o container pode ser inspecionado via "docker exec -it powershell-container pwsh"');
-  } catch (err) {
-    console.error('❌ Erro ao inicializar o container:', err);
-    console.warn('⚠️  Certifique-se de ter o Docker instalado e em execução.');
-  }
-}
-
-// Executa imediatamente a criação do container
-setupContainer();
-
+const fetch = require('node-fetch');
+const { exec, spawn } = require('child_process');
+const path = require('path');
+const os = require('os');
 
 const app = express();
 app.use(helmet());
 app.use(bodyParser.json({ limit: '200kb' }));
 
-// CONFIGURAÇÃO — defina variáveis de ambiente antes de rodar
 const PORT = process.env.PORT || 3001;
 const BIND_ADDR = '127.0.0.1';
-const SECRET = process.env.TERMINAL_TOKEN || 'troque-por-um-token-muito-forte';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ''; // sua chave Gemini
+const SECRET = process.env.TERMINAL_TOKEN || 'um-token-muito-forte-que-so-eu-conheco';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+
+let currentWorkingDir = process.cwd();
+
+console.log('Terminal PowerShell Integrado - Servidor iniciado');
+console.log('Diretorio inicial:', currentWorkingDir);
+console.log('Sistema operacional:', os.platform());
 
 if (!GEMINI_API_KEY) {
-  console.warn('Aviso: GEMINI_API_KEY não definido. Defina a variável de ambiente antes de usar.');
+  console.warn('Aviso: GEMINI_API_KEY nao definida.');
 }
 
-// Função simples de checagem de autenticação via Bearer token
 function checkAuth(req, res, next) {
   const auth = req.headers['authorization'] || '';
   if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   const token = auth.slice(7);
   if (token !== SECRET) return res.status(403).json({ error: 'Forbidden' });
   next();
-}
-
-// OPTIONAL: Lista branca de comandos (apenas exemplos).
-// Se preferir permissivo, mantenha a lista vazia e confie na confirmação manual.
-const WHITELIST = [
-  // comandos simples permitidos
-  '^whoami$',
-  '^date$',
-  '^uptime$',
-  '^ls($|\\s)',
-  '^dir($|\\s)',
-  '^echo\\s.+',
-  '^systeminfo$',
-  '^ping\\s+\\S+$'
-].map(r => new RegExp(r, 'i'));
-
-// Utilitário: verifica se o comando é permitido
-function isAllowedCommand(cmd) {
-  if (!WHITELIST || WHITELIST.length === 0) return true; // permitir se lista vazia
-  return WHITELIST.some(rx => rx.test(cmd.trim()));
 }
 
 // Endpoint: pedir à IA sugestões de comando (não executa)
@@ -134,34 +77,122 @@ Apenas comandos aprovados serão executados manualmente pelo usuário.`;
   }
 });
 
-// Endpoint: executar comando (só com token e após checagens)
-// Repare: este endpoint executa comandos no host — USE SOMENTE EM LOCALHOST e COM TOKEN SEGURO.
 app.post('/exec', checkAuth, (req, res) => {
-  const { command, requireWhitelist } = req.body || {};
-  if (!command || typeof command !== 'string') return res.status(400).json({ error: 'Comando inválido' });
-
-  // Segurança: bloquear uso de caracteres perigosos por padrão (pipes, redirecionamentos, etc.)
-  if (/[|&;<>]/.test(command)) {
-    return res.status(400).json({ error: 'Comando contém caracteres proibidos (| & ; < >).' });
+  const { command } = req.body || {};
+  if (!command || typeof command !== 'string') {
+    return res.status(400).json({ error: 'Comando invalido' });
   }
 
-  // Se for requerido, verifique lista branca
-  if (requireWhitelist && !isAllowedCommand(command)) {
-    return res.status(403).json({ error: 'Comando não está na lista branca.' });
-  }
+  const trimmedCmd = command.trim();
 
-  // Executa com timeout e limite de buffer
-  const containerCmd = `docker exec powershell-container pwsh -Command "${command}"`;
-exec(containerCmd, { timeout: 15_000, maxBuffer: 5 * 1024 * 1024 }, (err, stdout, stderr) => {
+  if (trimmedCmd.startsWith('cd ')) {
+    const newDir = trimmedCmd.substring(3).trim().replace(/['"]/g, '');
+    const targetDir = path.isAbsolute(newDir) ? newDir : path.join(currentWorkingDir, newDir);
 
-    if (err) {
-      return res.json({ ok: false, stdout: stdout || '', stderr: stderr || '', error: String(err) });
+    try {
+      const fs = require('fs');
+      if (fs.existsSync(targetDir) && fs.statSync(targetDir).isDirectory()) {
+        currentWorkingDir = path.resolve(targetDir);
+        return res.json({
+          ok: true,
+          stdout: `Diretorio alterado para: ${currentWorkingDir}\n`,
+          stderr: '',
+          cwd: currentWorkingDir
+        });
+      } else {
+        return res.json({
+          ok: false,
+          stdout: '',
+          stderr: `Diretorio nao encontrado: ${targetDir}\n`,
+          cwd: currentWorkingDir
+        });
+      }
+    } catch (err) {
+      return res.json({
+        ok: false,
+        stdout: '',
+        stderr: `Erro ao mudar diretorio: ${err.message}\n`,
+        cwd: currentWorkingDir
+      });
     }
-    res.json({ ok: true, stdout, stderr });
+  }
+
+  if (trimmedCmd === 'pwd') {
+    return res.json({
+      ok: true,
+      stdout: currentWorkingDir + '\n',
+      stderr: '',
+      cwd: currentWorkingDir
+    });
+  }
+
+  const isWindows = os.platform() === 'win32';
+  const shell = isWindows ? 'powershell.exe' : 'bash';
+  const shellArgs = isWindows ? ['-Command', trimmedCmd] : ['-c', trimmedCmd];
+
+  console.log(`Executando: ${trimmedCmd}`);
+  console.log(`Diretorio: ${currentWorkingDir}`);
+
+  const child = spawn(shell, shellArgs, {
+    cwd: currentWorkingDir,
+    timeout: 30000,
+    maxBuffer: 10 * 1024 * 1024,
+    env: { ...process.env, FORCE_COLOR: '0' }
+  });
+
+  let stdout = '';
+  let stderr = '';
+
+  child.stdout.on('data', (data) => {
+    stdout += data.toString();
+  });
+
+  child.stderr.on('data', (data) => {
+    stderr += data.toString();
+  });
+
+  child.on('close', (code) => {
+    console.log(`Comando finalizado com codigo: ${code}`);
+    res.json({
+      ok: code === 0,
+      stdout: stdout || '',
+      stderr: stderr || '',
+      exitCode: code,
+      cwd: currentWorkingDir
+    });
+  });
+
+  child.on('error', (err) => {
+    console.error('Erro ao executar comando:', err);
+    res.json({
+      ok: false,
+      stdout: stdout || '',
+      stderr: stderr || err.message,
+      error: err.message,
+      cwd: currentWorkingDir
+    });
+  });
+});
+
+app.get('/cwd', checkAuth, (req, res) => {
+  res.json({ cwd: currentWorkingDir });
+});
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'online',
+    server: 'Chat IA Gemini Terminal Real',
+    cwd: currentWorkingDir,
+    platform: os.platform(),
+    timestamp: new Date().toISOString()
   });
 });
 
 app.listen(PORT, BIND_ADDR, () => {
-  console.log(`Servidor terminal local rodando em http://${BIND_ADDR}:${PORT}`);
-  console.log('USE APENAS LOCAL. Configure GEMINI_API_KEY e TERMINAL_TOKEN nas variáveis de ambiente.');
+  console.log('='.repeat(60));
+  console.log('Terminal PowerShell Real - Servidor Online');
+  console.log(`URL: http://${BIND_ADDR}:${PORT}`);
+  console.log(`Token: ${SECRET}`);
+  console.log(`Diretorio: ${currentWorkingDir}`);
+  console.log('='.repeat(60));
 });

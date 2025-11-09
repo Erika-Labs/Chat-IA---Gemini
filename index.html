@@ -537,20 +537,20 @@
     </div>
 
     <div id="terminal-buttons-container">
-      <button id="open-terminal">🖥️ Terminal PowerShell</button>
-      <button id="start-server-btn">🚀 Iniciar Servidor</button>
-      <button id="download-server-btn">⬇️ Baixar Server.cjs</button>
-      <button id="download-installer-btn">📦 Baixar Instalador do Servidor</button>
+      <button id="open-terminal">Terminal PowerShell Real</button>
+      <button id="start-server-btn">Iniciar Servidor</button>
+      <button id="download-server-btn">Baixar Server.js</button>
+      <button id="download-installer-btn">Baixar Instalador</button>
     </div>
 
     <div id="terminal-panel">
       <div class="terminal-header-bar">
-        <span>Windows PowerShell — Terminal Integrado</span>
+        <span>Terminal PowerShell Real - Git e Pastas Locais Habilitados</span>
         <button id="close-terminal" class="close-terminal-btn">✕</button>
       </div>
       <div id="terminal-output"></div>
       <div class="terminal-input-area">
-        <input id="terminal-input" placeholder='Digite um comando (ex: dir, ipconfig, ping google.com)...' />
+        <input id="terminal-input" placeholder='Digite: git status, cd C:\projetos, dir, ls, pwd...' />
         <button id="terminal-send">Executar</button>
       </div>
     </div>
@@ -804,49 +804,68 @@
       }
     }
 
-    // Terminal Functions
+    let currentCwd = 'C:\\';
+
+    async function updateCurrentDir() {
+      try {
+        const response = await fetch('http://127.0.0.1:3001/cwd', {
+          headers: { 'Authorization': `Bearer ${TOKEN}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          currentCwd = data.cwd || currentCwd;
+        }
+      } catch (err) {
+        console.error('Erro ao obter diretorio atual:', err);
+      }
+    }
+
     function toggleTerminal() {
       const isOpen = terminalPanel.style.display === "flex";
       terminalPanel.style.display = isOpen ? "none" : "flex";
       if (!isOpen) {
         terminalInput.focus();
-        addTerminalMessage("Terminal PowerShell conectado. Digite 'help' para ver comandos disponíveis.");
+        updateCurrentDir();
+        addTerminalMessage("Terminal PowerShell Real - Comandos Git e navegacao de pastas habilitados");
+        addTerminalMessage("Digite 'help' para ver comandos disponiveis");
       }
     }
 
     function addTerminalMessage(message, type = "info") {
       const timestamp = new Date().toLocaleTimeString();
-      let color = "#00ff00"; // verde para info
-      
+      let color = "#00ff00";
+
       if (type === "error") color = "#ff4444";
       if (type === "warning") color = "#ffaa00";
       if (type === "command") color = "#88b0ff";
-      
+      if (type === "cwd") color = "#a78bfa";
+
       terminalOutput.innerHTML += `<span style="color:${color}">[${timestamp}] ${escapeHtml(message)}</span>\n`;
       terminalOutput.scrollTop = terminalOutput.scrollHeight;
     }
 
     function displayServerStartInstructions() {
       addTerminalMessage("=== INSTRUÇÕES PARA INICIAR SERVIDOR ===", "warning");
-      addTerminalMessage("1. Abra o PowerShell como Administrador");
-      addTerminalMessage("2. Execute: cd \"C:\\Gemini chat\"");
+      addTerminalMessage("1. Abra o PowerShell");
+      addTerminalMessage("2. Navegue ate a pasta do projeto");
       addTerminalMessage("3. Execute: node server.js");
-      addTerminalMessage("4. Aguarde a mensagem 'Servidor rodando na porta 3000'");
-      addTerminalMessage("5. O terminal abaixo funcionará automaticamente");
+      addTerminalMessage("4. Aguarde a mensagem 'Servidor Online'");
+      addTerminalMessage("5. O terminal estara pronto para uso");
     }
 
     async function executeTerminalCommand() {
       const command = terminalInput.value.trim();
       if (!command) return;
 
-      // Comandos locais (não requerem servidor)
       if (command === 'help') {
         addTerminalMessage("=== COMANDOS DISPONÍVEIS ===", "warning");
         addTerminalMessage("help - Mostra esta ajuda");
         addTerminalMessage("clear - Limpa o terminal");
-        addTerminalMessage("server - Instruções para iniciar servidor");
-        addTerminalMessage("date - Mostra data e hora atual");
-        addTerminalMessage("Outros comandos serão enviados ao servidor local");
+        addTerminalMessage("pwd - Mostra diretorio atual");
+        addTerminalMessage("cd <pasta> - Muda de diretorio");
+        addTerminalMessage("dir / ls - Lista arquivos");
+        addTerminalMessage("git <comando> - Comandos Git (ex: git status, git add, git commit)");
+        addTerminalMessage("Todos os comandos PowerShell/Bash sao suportados");
         terminalInput.value = '';
         return;
       }
@@ -863,14 +882,8 @@
         return;
       }
 
-      if (command === 'date') {
-        addTerminalMessage(`Data/Hora atual: ${new Date().toLocaleString('pt-BR')}`);
-        terminalInput.value = '';
-        return;
-      }
-
-      // Mostrar comando no terminal
-      addTerminalMessage(`PS C:\\Gemini chat> ${command}`, "command");
+      const prompt = `PS ${currentCwd}> ${command}`;
+      addTerminalMessage(prompt, "command");
       terminalInput.value = '';
 
       try {
@@ -888,7 +901,11 @@
         }
 
         const data = await response.json();
-        
+
+        if (data.cwd) {
+          currentCwd = data.cwd;
+        }
+
         if (data.stdout) {
           addTerminalMessage(data.stdout);
         }
@@ -899,10 +916,14 @@
           addTerminalMessage(`Erro: ${data.error}`, "error");
         }
 
+        if (data.cwd) {
+          addTerminalMessage(`Diretorio atual: ${data.cwd}`, "cwd");
+        }
+
       } catch (error) {
-        addTerminalMessage(`❌ Erro de conexão: ${error.message}`, "error");
-        addTerminalMessage("💡 Certifique-se de que o servidor está rodando em localhost:3000", "warning");
-        addTerminalMessage("Execute 'server' para ver instruções de como iniciar o servidor", "warning");
+        addTerminalMessage(`Erro de conexao: ${error.message}`, "error");
+        addTerminalMessage("Certifique-se de que o servidor esta rodando em localhost:3001", "warning");
+        addTerminalMessage("Execute 'server' para ver instrucoes", "warning");
       }
     }
 
@@ -984,9 +1005,7 @@
       }
     });
 
-    // Initialize terminal
-    addTerminalMessage("Terminal PowerShell Integrado - Pronto para uso");
-    addTerminalMessage("Digite 'help' para ver comandos disponíveis");
+    // Initialize
 
     // Initialize chat
     renderConversationList();
