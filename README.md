@@ -1,41 +1,68 @@
-# 💬 Chat IA - Gemini 2.0
+# Chat IA - Gemini 2.0 com Terminal PowerShell Real
 
-**Chat IA - Gemini 2.0** é um projeto de chatbot inteligente e personalizável, desenvolvido para oferecer uma experiência de conversa natural, eficiente e com identidade própria. Ideal para aplicações que exigem interação humana simulada, suporte técnico ou assistentes virtuais com personalidade definida.
+Chat inteligente com IA Gemini 2.0 e terminal PowerShell integrado que permite executar comandos Git e acessar pastas locais.
 
-## 🚀 Funcionalidades
+## Funcionalidades
 
-- **Interface intuitiva**: design limpo e responsivo, com botão de nova conversa e menu de configurações.
-- **Identidade configurável**: a IA assume o papel de **Julio Campos Machado**, um especialista em programação full stack, arquitetura de sistemas e inteligência artificial.
-- **Respostas contextuais**: linguagem amigável e adaptada ao perfil definido, com foco em empatia e clareza.
-- **Personalização fácil**: permite ajustar o comportamento e estilo da IA conforme o propósito do projeto.
+- Chat com IA Gemini 2.0 configuravel
+- Terminal PowerShell Real integrado
+- Suporte completo a comandos Git
+- Navegacao em pastas locais (cd, ls, dir, pwd)
+- Execucao de qualquer comando PowerShell/Bash
+- Persistencia de conversas no localStorage
+- Interface moderna e responsiva
 
-## 🛠️ Tecnologias utilizadas
+## Terminal PowerShell Real
 
-- **Next.js** com **Vercel** para hospedagem
-- **React** para construção da interface
-- **Tailwind CSS** para estilização moderna
-- **OpenAI API** ou similar para processamento de linguagem natural
+O terminal integrado executa comandos diretamente no seu sistema operacional:
 
-## 📦 Como usar
+### Comandos suportados:
+- `git status` - Verificar status do repositorio Git
+- `git add .` - Adicionar arquivos ao stage
+- `git commit -m "mensagem"` - Fazer commit
+- `git push` - Enviar alteracoes para o GitHub
+- `cd C:\pasta` - Navegar entre diretorios
+- `dir` / `ls` - Listar arquivos
+- `pwd` - Mostrar diretorio atual
+- Qualquer comando PowerShell ou Bash
 
-1. Clone o repositório:
-   ```bash
-   git clone https://github.com/seu-usuario/chat-ia-gemini.git
-   ```
-2. Instale as dependências:
-   ```bash
-   npm install
-   ```
-3. Configure as variáveis de ambiente (API Key, etc.)
-4. Inicie o servidor:
-   ```bash
-   npm run dev
-   ```
+## Como usar
 
-## ✨ Personalização
+### 1. Iniciar o servidor backend
 
-Você pode editar a persona da IA diretamente no arquivo de configuração, ajustando nome, profissão, estilo de fala e áreas de conhecimento. Isso permite criar experiências únicas para diferentes públicos e finalidades.
+```bash
+node server.js
+```
 
-## 📄 Licença
+O servidor ira iniciar em http://127.0.0.1:3001
 
-Este projeto está licenciado sob a [MIT License](LICENSE).
+### 2. Abrir o frontend
+
+Abra o arquivo `index.html` diretamente no navegador
+
+### 3. Configurar a API Gemini
+
+1. Clique no botao de configuracoes (engrenagem)
+2. Insira sua chave da API Gemini
+3. Configure o modelo (padrao: gemini-2.0-flash-exp)
+4. Ajuste a persona da IA conforme necessario
+
+### 4. Usar o Terminal
+
+1. Clique em "Terminal PowerShell Real"
+2. Digite comandos como: `git status`, `cd C:\projetos`, `dir`
+3. O terminal mantem o contexto do diretorio atual
+
+## Requisitos
+
+- Node.js >= 16
+- Chave da API Google Gemini
+- Git (para comandos Git)
+
+## Seguranca
+
+O servidor backend so aceita conexoes locais (127.0.0.1) e requer token de autenticacao. Use apenas em ambiente local confiavel.
+
+## Licenca
+
+MIT License
